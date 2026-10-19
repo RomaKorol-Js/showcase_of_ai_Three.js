@@ -1,0 +1,45 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: 'Inter', sans-serif;
+    background-color: #0d0805;
+    color: #f3f4f6;
+    user-select: none;
+}
+#canvas-container {
+    width: 100vw;
+    height: 100vh;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+.glass-panel {
+    background: rgba(28, 20, 16, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(217, 119, 6, 0.2);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+.glass-panel-accent {
+    background: rgba(38, 26, 20, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
+}
+/* UI Smooth Slide/Collapse Transitions */
+.ui-panel-container {
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ui-collapsed-left {
+    transform: translateX(-110%);
+    opacity: 0;
+    pointer-events: none !important;
+}
+.ui-collapsed-right {
+    transform: translateX(110%);
+    opacity: 0;
+    pointer-events: none !important;
+}

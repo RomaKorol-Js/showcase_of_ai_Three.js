@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="An atmospheric Three.js village scene with interactive lighting and inspection controls.">
+    <title>Rust &amp; Timber Atmospheric Village</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- Toggle UI Floating Quick Button -->
+    <button id="btn-toggle-ui-main" class="absolute top-6 left-6 z-30 px-3.5 py-2 glass-panel rounded-xl text-xs text-amber-200 hover:text-amber-100 border border-amber-500/40 hover:border-amber-400 transition-all duration-300 flex items-center space-x-2 shadow-lg cursor-pointer">
+        <span id="toggle-ui-icon">👁️</span>
+        <span id="toggle-ui-text" class="font-medium">Hide UI</span>
+    </button>
+
+    <!-- Top Left Overview Panel -->
+    <div id="panel-left" class="ui-panel-container absolute top-20 left-6 z-10 pointer-events-none">
+        <div class="glass-panel p-6 rounded-2xl max-w-sm pointer-events-auto transition-all duration-300">
+            <div class="flex items-center space-x-3 mb-2">
+                <div class="w-3 h-3 rounded-full bg-amber-500 animate-pulse"></div>
+                <h1 class="text-xl font-semibold tracking-wide text-amber-100">Rustic Haven</h1>
+            </div>
+            <p class="text-xs text-amber-200/70 leading-relaxed mb-4">
+                Procedural Windmill and Farmhouse scene with real-time post-processing bloom, interactive lighting, and cinematic click inspection.
+            </p>
+            <div class="space-y-3 text-xs text-amber-100/80">
+                <div class="flex justify-between items-center border-b border-amber-900/40 pb-2">
+                    <span class="text-amber-200/60">Atmosphere</span>
+                    <span id="sky-status-text" class="font-mono text-amber-400">Warm Sunset</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-amber-900/40 pb-2">
+                    <span class="text-amber-200/60">Windmill Rotor</span>
+                    <span id="rotor-status" class="font-mono text-emerald-400">Active (4 Blades)</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-amber-900/40 pb-2">
+                    <span class="text-amber-200/60">Roof Accent</span>
+                    <span class="font-mono text-amber-300">Spinning Weathervane</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-amber-200/60">Interactive Mode</span>
+                    <span id="mode-status-text" class="font-mono text-emerald-300">Click Object to Focus</span>
+                </div>
+            </div>
+            <div class="mt-5 pt-3 border-t border-amber-900/40 flex items-center justify-between text-[11px] text-amber-200/50">
+                <span>Click Object to Inspect</span>
+                <span>•</span>
+                <span>Drag to Rotate</span>
+                <span>•</span>
+                <span>Scroll Zoom</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Right Controls Panel -->
+    <div id="panel-right" class="ui-panel-container absolute top-6 right-6 z-10 pointer-events-none">
+        <div class="glass-panel p-5 rounded-2xl w-80 pointer-events-auto transition-all duration-300 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-amber-900/40">
+                <span class="text-xs font-semibold text-amber-100 uppercase tracking-wider">Scene Controls</span>
+                <div class="flex items-center space-x-2">
+                    <button id="btn-pause" class="px-3 py-1 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/40 rounded-lg text-xs text-amber-200 font-medium transition-colors flex items-center space-x-1.5">
+                        <span id="btn-pause-icon">⏸</span>
+                        <span id="btn-pause-text">Pause</span>
+                    </button>
+                    <button id="btn-hide-ui-corner" title="Minimize UI" class="p-1 text-amber-300/70 hover:text-amber-100 hover:bg-amber-800/40 rounded-lg transition-colors text-sm">
+                        ✕
+                    </button>
+                </div>
+            </div>
+
+            <!-- Wind Speed Control -->
+            <div class="space-y-1.5">
+                <div class="flex justify-between text-xs">
+                    <label for="slider-wind" class="text-amber-200/70 font-medium">Wind Speed</label>
+                    <span id="val-wind" class="font-mono text-amber-400 text-xs">1.0x</span>
+                </div>
+                <input id="slider-wind" type="range" min="0" max="30" value="10" class="w-full h-1.5 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-amber-500">
+            </div>
+
+            <!-- Time Cycle Controls -->
+            <div class="space-y-2 pt-1 border-t border-amber-900/40">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-amber-200/70 font-medium">Day/Night Cycle</span>
+                    <button id="btn-toggle-time" class="px-2.5 py-0.5 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/40 rounded-md text-[11px] text-amber-200 font-medium transition-colors flex items-center space-x-1">
+                        <span id="btn-time-icon">⏸</span>
+                        <span id="btn-time-text">Pause Time</span>
+                    </button>
+                </div>
+
+                <!-- Time Cycle Speed Slider -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[11px]">
+                        <span class="text-amber-200/50">Cycle Speed</span>
+                        <span id="val-time-speed" class="font-mono text-amber-400">1.0x</span>
+                    </div>
+                    <input id="slider-time-speed" type="range" min="0" max="50" value="10" class="w-full h-1.5 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                </div>
+            </div>
+
+            <!-- Bloom Intensity Control -->
+            <div class="space-y-1.5 pt-1 border-t border-amber-900/40">
+                <div class="flex justify-between text-xs">
+                    <label for="slider-bloom" class="text-amber-200/70 font-medium">Bloom Glow</label>
+                    <span id="val-bloom" class="font-mono text-amber-400 text-xs">0.85</span>
+                </div>
+                <input id="slider-bloom" type="range" min="0" max="20" value="8" class="w-full h-1.5 bg-amber-950 rounded-lg appearance-none cursor-pointer accent-amber-500">
+            </div>
+
+            <!-- Reset View Button -->
+            <button id="btn-reset-view" class="w-full py-2 bg-amber-600/20 hover:bg-amber-600/40 border border-amber-500/30 rounded-xl text-xs text-amber-200 font-medium transition-all duration-200 flex items-center justify-center space-x-2">
+                <span>🎥</span>
+                <span>Reset Overview Camera</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Floating Inspection Info Card (Dynamic Position & Visibility) -->
+    <div id="info-card" class="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 pointer-events-none opacity-0 transition-all duration-500 transform translate-y-4">
+        <div class="glass-panel-accent px-6 py-5 rounded-2xl max-w-md pointer-events-auto flex items-start space-x-4 border border-amber-500/40">
+            <div id="info-card-icon" class="text-3xl p-2.5 rounded-xl bg-amber-950/80 border border-amber-500/30 shrink-0">
+                🌾
+            </div>
+            <div class="space-y-1 pr-2">
+                <div class="flex items-center justify-between">
+                    <h2 id="info-card-title" class="text-base font-semibold text-amber-100">Structure Title</h2>
+                    <span id="info-card-tag" class="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Target</span>
+                </div>
+                <p id="info-card-desc" class="text-xs text-amber-200/80 leading-relaxed">
+                    Detailed description of the inspectable element.
+                </p>
+                <div class="pt-2 flex items-center justify-between text-[11px] text-amber-300/70">
+                    <span id="info-card-meta">Coordinates: (0, 0, 0)</span>
+                    <button id="info-card-close" class="text-amber-400 hover:text-amber-200 font-semibold underline underline-offset-2 ml-4">Close Inspection</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
