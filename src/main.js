@@ -86,6 +86,9 @@ function init() {
     controls.minDistance = 4;
     controls.maxDistance = 60;
     controls.target.copy(defaultControlsTarget);
+    controls.addEventListener('start', () => {
+        isCameraLerping = false;
+    });
 
     // Post-Processing (EffectComposer & UnrealBloomPass)
     composer = new EffectComposer(renderer);
@@ -120,15 +123,17 @@ function setupLighting() {
     sunLight = new THREE.DirectionalLight(0xffcd94, 3.2);
     sunLight.position.set(20, 25, 15);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.mapSize.set(4096, 4096);
     sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 70;
-    sunLight.shadow.camera.left = -25;
-    sunLight.shadow.camera.right = 25;
-    sunLight.shadow.camera.top = 25;
-    sunLight.shadow.camera.bottom = -25;
-    sunLight.shadow.bias = -0.0003;
+    sunLight.shadow.camera.far = 60;
+    sunLight.shadow.camera.left = -18;
+    sunLight.shadow.camera.right = 18;
+    sunLight.shadow.camera.top = 18;
+    sunLight.shadow.camera.bottom = -18;
+    sunLight.shadow.bias = -0.0001;
+    sunLight.shadow.normalBias = 0.04;
+    sunLight.shadow.radius = 3;
+    sunLight.shadow.camera.updateProjectionMatrix();
     scene.add(sunLight);
 
     // Soft Fill Light from opposite direction
@@ -250,12 +255,45 @@ function buildWindmill() {
     roofMesh.castShadow = true;
     windmillGroup.add(roofMesh);
 
-    // Windmill Door
-    const doorGeo = new THREE.BoxGeometry(1.0, 2.0, 0.15);
-    const doorMesh = new THREE.Mesh(doorGeo, darkWoodMat);
-    doorMesh.position.set(0, 1.75, 3.82);
-    doorMesh.castShadow = true;
+    // Door panels follow the tower's taper and the front cylinder facet.
+    const towerFrontSurface = (x, y, offset = 0) => {
+        const radius = THREE.MathUtils.lerp(3.4, 2.6, (y - 1.5) / 9);
+        return radius * Math.cos(Math.PI / 16) - Math.abs(x) * Math.tan(Math.PI / 16) + offset;
+    };
+    const makeTowerPanel = (width, height, x, y, offset, material) => {
+        const geometry = new THREE.PlaneGeometry(width, height, 8, 4);
+        const positions = geometry.attributes.position;
+        for (let i = 0; i < positions.count; i++) {
+            const panelX = x + positions.getX(i);
+            const panelY = y + positions.getY(i);
+            positions.setZ(i, towerFrontSurface(panelX, panelY, offset));
+        }
+        geometry.computeVertexNormals();
+        const panel = new THREE.Mesh(geometry, material);
+        panel.position.set(x, y, 0);
+        panel.castShadow = true;
+        return panel;
+    };
+
+    const doorCenterY = 2.38;
+    const doorMesh = makeTowerPanel(0.92, 1.62, 0, doorCenterY, 0.035, darkWoodMat);
     windmillGroup.add(doorMesh);
+
+    const doorFrameMat = new THREE.MeshStandardMaterial({ color: COLORS.weatheredWood, roughness: 0.8 });
+    const doorFrame = new THREE.Group();
+    for (const x of [-0.53, 0.53]) {
+        doorFrame.add(makeTowerPanel(0.12, 1.78, x, doorCenterY, 0.075, doorFrameMat));
+    }
+    doorFrame.add(makeTowerPanel(1.18, 0.12, 0, 3.27, 0.075, doorFrameMat));
+    windmillGroup.add(doorFrame);
+
+    const doorHandle = new THREE.Mesh(
+        new THREE.SphereGeometry(0.065, 10, 8),
+        new THREE.MeshStandardMaterial({ color: COLORS.metalBronze, metalness: 0.65, roughness: 0.35 })
+    );
+    doorHandle.position.set(-0.3, 2.38, towerFrontSurface(-0.3, 2.38, 0.12));
+    doorHandle.castShadow = true;
+    windmillGroup.add(doorHandle);
 
     // Upper Window
     const windowGeo = new THREE.BoxGeometry(0.6, 0.9, 0.1);
@@ -382,34 +420,39 @@ function buildFarmhouse() {
 
     // Roof Panels
     const roofPitch = Math.atan2(2.5, 3.5);
-    const roofLength = Math.sqrt(3.5 * 3.5 + 2.5 * 2.5) + 0.5;
+    const roofSlopeLength = Math.hypot(3.5, 2.5);
+    const roofOverhang = 0.25;
+    const roofLength = roofSlopeLength + roofOverhang;
+    const roofCenterDistance = roofLength / 2;
+    const roofCenterX = roofCenterDistance * Math.cos(roofPitch);
+    const roofCenterY = 7 - roofCenterDistance * Math.sin(roofPitch);
     const roofWidth = 5.8;
 
     const roofTileGeo = new THREE.BoxGeometry(roofLength, 0.2, roofWidth);
 
     const roofRight = new THREE.Mesh(roofTileGeo, rustMat);
-    roofRight.position.set(1.75, 5.75, 0);
+    roofRight.position.set(roofCenterX, roofCenterY, 0);
     roofRight.rotation.z = -roofPitch;
     roofRight.castShadow = true;
-    roofRight.receiveShadow = true;
+    roofRight.receiveShadow = false;
     houseGroup.add(roofRight);
 
     const roofLeft = new THREE.Mesh(roofTileGeo, rustMat);
-    roofLeft.position.set(-1.75, 5.75, 0);
+    roofLeft.position.set(-roofCenterX, roofCenterY, 0);
     roofLeft.rotation.z = roofPitch;
     roofLeft.castShadow = true;
-    roofLeft.receiveShadow = true;
+    roofLeft.receiveShadow = false;
     houseGroup.add(roofLeft);
 
     // Wooden Roof Ridge Cap Beam
     const ridgeCap = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, roofWidth), darkWoodMat);
-    ridgeCap.position.set(0, 7.05, 0);
+    ridgeCap.position.set(0, 7.2, 0);
     ridgeCap.castShadow = true;
     houseGroup.add(ridgeCap);
 
     // Weather Vane Assembly
     const weatherVaneGroup = new THREE.Group();
-    weatherVaneGroup.position.set(-1.5, 7.2, 0);
+    weatherVaneGroup.position.set(0, 7.35, 0);
 
     const vaneMetalMat = new THREE.MeshStandardMaterial({ color: COLORS.metalBronze, roughness: 0.4, metalness: 0.8 });
     
@@ -607,11 +650,11 @@ function buildDecorations() {
 
     // Bushes
     const bushPositions = [
-        { x: 4, z: 2.2, r: 0.8, color: COLORS.foliageGreen },
-        { x: 10, z: 2.5, r: 0.65, color: COLORS.foliageLush },
-        { x: 3.5, z: -0.5, r: 0.75, color: COLORS.foliageAutumn },
-        { x: -6, z: -5, r: 0.9, color: COLORS.foliageGreen },
-        { x: -10, z: 1, r: 0.7, color: COLORS.foliageLush }
+        { x: 2.7, z: 0.8, r: 0.55, color: COLORS.foliageGreen },
+        { x: 11.2, z: 0.6, r: 0.5, color: COLORS.foliageLush },
+        { x: 4, z: -2.25, r: 0.55, color: COLORS.foliageAutumn },
+        { x: -12, z: -5, r: 0.7, color: COLORS.foliageGreen },
+        { x: 12, z: 4.5, r: 0.55, color: COLORS.foliageLush }
     ];
 
     bushPositions.forEach(b => {
